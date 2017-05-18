@@ -15,10 +15,11 @@ extern crate serde_urlencoded;
 extern crate tokio_core;
 extern crate url;
 
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 
 use futures::{Future, IntoFuture};
-use hyper::{Client as HyperClient, Request as HyperRequest, Response as HyperResponse};
+use futures::future::FutureFrom;
+use hyper::Client as HyperClient;
 use hyper::client::HttpConnector;
 use ruma_api::Endpoint;
 use tokio_core::reactor::Handle;
@@ -49,23 +50,19 @@ impl Client {
     }
 
     /// Makes a request to a Matrix API endpoint.
-    pub fn request<E>(&self, request: <E as Endpoint>::Request)
-    -> impl Future<Item = E::Response, Error = Error>
-    where E: Endpoint,
-    E::Response: 'static,
-    Error: From<<E::Request as TryInto<HyperRequest>>::Error>,
-    Error: From<<E::Response as TryFrom<HyperResponse>>::Error> {
+    pub fn request<E: Endpoint>(
+        &self,
+        request: <E as Endpoint>::Request,
+    ) -> impl Future<Item = E::Response, Error = Error> {
         let cloned_hyper = self.hyper.clone();
 
         request
             .try_into()
             .map_err(Error::from)
             .into_future()
-            .and_then(move |hyper_request| {
-                cloned_hyper.request(hyper_request).map_err(Error::from)
-            })
-            .and_then(|hyper_response| {
-                hyper_response.try_into().map_err(Error::from)
-            })
+            .and_then(move |hyper_request| cloned_hyper.request(hyper_request).map_err(Error::from))
+            .and_then(
+                |hyper_response| E::Response::future_from(hyper_response).map_err(Error::from),
+            )
     }
 }

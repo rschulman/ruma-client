@@ -28,4 +28,4 @@ git = "https://github.com/ruma/ruma-api"
 
 [dependencies.ruma-client-api]
 git = "https://github.com/ruma/ruma-client-api"
-branch = "manual"
+branch = "macros"
