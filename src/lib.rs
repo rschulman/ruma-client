@@ -70,26 +70,30 @@ impl Client {
     }
 
     /// Registers as guest
-    pub fn guest_session<'a>(&'a mut self) -> impl Future<Item=(), Error=Error> + 'a {
-        let request_data : register::Request = register::Request {
-            bind_email: None,
-            password: None,
-            username: None,
-            device_id: None,
-            initial_device_display_name: None,
-            auth: None,
-            kind: Some(register::RegistrationKind::Guest)
-        };
-        let response_future = self.request::<register::Endpoint>(request_data);
-        let eval_future = response_future.and_then(move |response : register::Response| {
-            self.session = Some(Session {
-                access_token: response.access_token,
-                homeserver: Host::parse(&response.home_server)?,
-                user_id: response.user_id
-            });
-            let res : Result<(), Error> = Ok(());
-            res 
-        });
-        eval_future
+    pub fn guest_session<'a>(&'a mut self) -> impl Future<Item = (), Error = Error> + 'a {
+        self.request::<register::Endpoint>(
+                register::Request {
+                    bind_email: None,
+                    password: None,
+                    username: None,
+                    device_id: None,
+                    initial_device_display_name: None,
+                    auth: None,
+                    kind: Some(register::RegistrationKind::Guest),
+                }
+            )
+            .and_then(
+                move |response: register::Response| {
+                    self.session = Some(
+                        Session {
+                            access_token: response.access_token,
+                            homeserver: Host::parse(&response.home_server)?,
+                            user_id: response.user_id,
+                        }
+                    );
+
+                    Ok(())
+                }
+            )
     }
 }
