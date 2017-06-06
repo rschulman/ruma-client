@@ -27,6 +27,7 @@ use url::Url;
 use url::Host;
 use hyper::Uri;
 use std::str::FromStr;
+use std::fmt::Debug;
 
 pub use error::Error;
 pub use session::Session;
@@ -60,7 +61,7 @@ impl Client {
         request: <E as Endpoint>::Request,
     ) -> impl Future<Item = E::Response, Error = Error> {
         let cloned_hyper = self.hyper.clone();
-        let path = self.homeserver_url.join(&E::METADATA.path).unwrap();
+        let path = self.homeserver_url.join(&E::METADATA.path).unwrap().join("?kind=guest").unwrap();
 
         request
             .try_into()
