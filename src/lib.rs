@@ -6,6 +6,7 @@
 
 extern crate futures;
 extern crate hyper;
+extern crate hyper_tls;
 extern crate ruma_api;
 pub extern crate ruma_client_api;
 extern crate ruma_identifiers;
@@ -20,14 +21,13 @@ use std::convert::TryInto;
 use futures::{Future, IntoFuture};
 use futures::future::FutureFrom;
 use hyper::Client as HyperClient;
-use hyper::client::HttpConnector;
+use hyper_tls::HttpsConnector;
 use ruma_api::Endpoint;
 use tokio_core::reactor::Handle;
 use url::Url;
 use url::Host;
 use hyper::Uri;
 use std::str::FromStr;
-use std::fmt::Debug;
 
 pub use error::Error;
 pub use session::Session;
@@ -41,7 +41,7 @@ use ruma_client_api::r0::account::register;
 #[derive(Debug)]
 pub struct Client {
     homeserver_url: Url,
-    hyper: HyperClient<HttpConnector>,
+    hyper: HyperClient<HttpsConnector>,
     session: Option<Session>,
 }
 
@@ -50,7 +50,10 @@ impl Client {
     pub fn new(handle: &Handle, homeserver_url: Url) -> Self {
         Client {
             homeserver_url,
-            hyper: HyperClient::configure().keep_alive(true).build(handle),
+            hyper: HyperClient::configure()
+                .connector(HttpsConnector::new(/* DNS worker threads: */ 1, &handle))
+                .keep_alive(true)
+                .build(handle),
             session: None,
         }
     }

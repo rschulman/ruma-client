@@ -9,7 +9,7 @@ use url::Url;
 fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
-    let server = Url::parse("http://matrix.org/").unwrap();
+    let server = Url::parse("https://matrix.org/").unwrap();
     println!("Create client");
     let mut client = Client::new(&handle, server);
     println!("Client is not conneted: {:?}", client);
