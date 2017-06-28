@@ -26,8 +26,6 @@ use ruma_api::Endpoint;
 use tokio_core::reactor::Handle;
 use url::Url;
 use url::Host;
-use hyper::Uri;
-use std::str::FromStr;
 
 pub use error::Error;
 pub use session::Session;
@@ -64,14 +62,21 @@ impl Client {
         request: <E as Endpoint>::Request,
     ) -> impl Future<Item = E::Response, Error = Error> {
         let cloned_hyper = self.hyper.clone();
-        let path = self.homeserver_url.join(&E::METADATA.path).unwrap().join("?kind=guest").unwrap();
+        let mut url = self.homeserver_url.clone();
 
         request
             .try_into()
             .map_err(Error::from)
             .into_future()
             .and_then(move |mut hyper_request| {
-                let uri = Uri::from_str(path.as_str()).unwrap();
+                // Combine homeserver URL from self with path and query params from hyper_request
+                // TODO: Rewrite this when Uri supports it directly - https://github.com/hyperium/hyper/issues/1102
+                url.set_path(hyper_request.uri().path());
+                url.set_query(hyper_request.uri().query());
+
+                // Every valid url is a valid uri
+                let uri = url.into_string().parse().unwrap();
+
                 hyper_request.set_uri(uri);
                 cloned_hyper.request(hyper_request).map_err(Error::from)
             })

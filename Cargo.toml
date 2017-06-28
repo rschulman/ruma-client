@@ -25,8 +25,7 @@ git = "https://github.com/hyperium/hyper-tls"
 rev = "52f39a2635e90b0c04e37e98b8b959bd6780c34b"
 
 [dependencies.ruma-api]
-git = "https://github.com/ruma/ruma-api"
-rev = "211cf5e3531cd1862136129d5f73caaac7b4eb43"
+git = "https://github.com/jplatte/ruma-api"
 
 [dependencies.ruma-client-api]
 git = "https://github.com/jplatte/ruma-client-api"
