@@ -30,3 +30,6 @@ git = "https://github.com/jplatte/ruma-api"
 [dependencies.ruma-client-api]
 git = "https://github.com/jplatte/ruma-client-api"
 branch = "macros"
+
+[dev-dependencies]
+ruma-events = "0.9.0"
