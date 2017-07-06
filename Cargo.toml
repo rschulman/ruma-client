@@ -28,8 +28,8 @@ rev = "52f39a2635e90b0c04e37e98b8b959bd6780c34b"
 git = "https://github.com/jplatte/ruma-api"
 
 [dependencies.ruma-client-api]
-git = "https://github.com/jplatte/ruma-client-api"
-branch = "macros"
+git = "https://github.com/rschulman/ruma-client-api"
+branch = "sync"
 
 [dev-dependencies]
 ruma-events = "0.9.0"

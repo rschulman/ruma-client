@@ -34,6 +34,7 @@ mod error;
 mod session;
 
 use ruma_client_api::r0::account::register;
+use ruma_client_api::r0::session::login;
 
 /// A client for the Matrix client-server API.
 #[derive(Debug)]
@@ -83,6 +84,31 @@ impl Client {
             .and_then(
                 |hyper_response| E::Response::future_from(hyper_response).map_err(Error::from),
             )
+    }
+
+    /// Logs in as a given user
+    pub fn login<'a>(&'a mut self, username: String, password: String) -> impl Future<Item = (), Error = Error> + 'a {
+        self.request::<login::Endpoint>(
+            login::Request {
+                password: password,
+                medium: None,
+                kind: login::LoginKind::Password,
+                user: username,
+                address: None,
+            }
+        ).and_then(
+            move |response: login::Response| {
+                self.session = Some(
+                    Session {
+                        access_token: response.access_token,
+                        homeserver: Host::parse(&response.home_server)?,
+                        user_id: response.user_id,
+                    }
+                );
+
+                Ok(())
+            }
+        )
     }
 
     /// Registers as guest
