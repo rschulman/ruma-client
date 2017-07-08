@@ -6,9 +6,12 @@
 
 extern crate futures;
 extern crate hyper;
+#[cfg(feature = "tls")]
 extern crate hyper_tls;
+#[cfg(feature = "tls")]
+extern crate native_tls;
 extern crate ruma_api;
-pub extern crate ruma_client_api;
+extern crate ruma_client_api;
 extern crate ruma_identifiers;
 extern crate serde;
 extern crate serde_json;
@@ -17,11 +20,16 @@ extern crate tokio_core;
 extern crate url;
 
 use std::convert::TryInto;
+use std::rc::Rc;
+use std::str::FromStr;
 
-use futures::{Future, IntoFuture};
-use futures::future::FutureFrom;
-use hyper::Client as HyperClient;
+use futures::future::{Future, FutureFrom, IntoFuture};
+use hyper::{Client as HyperClient, Uri};
+use hyper::client::{Connect, HttpConnector};
+#[cfg(feature = "hyper-tls")]
 use hyper_tls::HttpsConnector;
+#[cfg(feature = "hyper-tls")]
+use native_tls::Error as NativeTlsError;
 use ruma_api::Endpoint;
 use tokio_core::reactor::Handle;
 use url::Url;
@@ -30,6 +38,8 @@ use url::Host;
 pub use error::Error;
 pub use session::Session;
 
+/// Matrix client-server API endpoints.
+pub mod api;
 mod error;
 mod session;
 
@@ -38,52 +48,98 @@ use ruma_client_api::r0::session::login;
 
 /// A client for the Matrix client-server API.
 #[derive(Debug)]
-pub struct Client {
+pub struct Client<C>
+where
+    C: Connect,
+{
     homeserver_url: Url,
-    hyper: HyperClient<HttpsConnector>,
+    hyper: Rc<HyperClient<C>>,
     session: Option<Session>,
 }
 
-impl Client {
-    /// Creates a new client for making requests to the given homeserver.
+impl Client<HttpConnector> {
+    /// Creates a new client for making HTTP requests to the given homeserver.
     pub fn new(handle: &Handle, homeserver_url: Url) -> Self {
         Client {
             homeserver_url,
-            hyper: HyperClient::configure()
-                .connector(HttpsConnector::new(/* DNS worker threads: */ 1, &handle))
-                .keep_alive(true)
-                .build(handle),
+            hyper: Rc::new(HyperClient::configure().keep_alive(true).build(handle)),
+            session: None,
+        }
+    }
+}
+
+#[cfg(feature = "tls")]
+impl Client<HttpsConnector<HttpConnector>> {
+    /// Creates a new client for making HTTPS requests to the given homeserver.
+    pub fn https(handle: &Handle, homeserver_url: Url) -> Result<Self, NativeTlsError> {
+        let connector = HttpsConnector::new(4, handle)?;
+
+        Ok(Client {
+            homeserver_url,
+            hyper: Rc::new(
+                HyperClient::configure()
+                    .connector(connector)
+                    .keep_alive(true)
+                    .build(handle),
+            ),
+            session: None,
+        })
+    }
+}
+
+impl<C> Client<C>
+where
+    C: Connect,
+{
+    /// Creates a new client using the given `hyper::Client`.
+    ///
+    /// This allows the user to configure the details of HTTP as desired.
+    pub fn custom(hyper_client: HyperClient<C>, homeserver_url: Url) -> Self {
+        Client {
+            homeserver_url,
+            hyper: Rc::new(hyper_client),
             session: None,
         }
     }
 
     /// Makes a request to a Matrix API endpoint.
-    pub fn request<E: Endpoint>(
-        &self,
+    pub(crate) fn request<'a, E>(
+        &'a self,
         request: <E as Endpoint>::Request,
-    ) -> impl Future<Item = E::Response, Error = Error> {
-        let cloned_hyper = self.hyper.clone();
+    ) -> impl Future<Item = E::Response, Error = Error> + 'a
+    where
+        E: Endpoint,
+        <E as Endpoint>::Response: 'a,
+    {
         let mut url = self.homeserver_url.clone();
 
         request
             .try_into()
             .map_err(Error::from)
             .into_future()
-            .and_then(move |mut hyper_request| {
-                // Combine homeserver URL from self with path and query params from hyper_request
-                // TODO: Rewrite this when Uri supports it directly - https://github.com/hyperium/hyper/issues/1102
-                url.set_path(hyper_request.uri().path());
-                url.set_query(hyper_request.uri().query());
+                        .and_then(move |hyper_request| {
+                {
+                    let uri = hyper_request.uri();
 
-                // Every valid url is a valid uri
-                let uri = url.into_string().parse().unwrap();
+                    url.set_path(uri.path());
+                    url.set_query(uri.query());
+                }
 
-                hyper_request.set_uri(uri);
-                cloned_hyper.request(hyper_request).map_err(Error::from)
+                Uri::from_str(url.as_ref())
+                    .map(move |uri| (uri, hyper_request))
+                    .map_err(Error::from)
             })
-            .and_then(
-                |hyper_response| E::Response::future_from(hyper_response).map_err(Error::from),
-            )
+            .and_then(move |(uri, mut hyper_request)| {
+                hyper_request.set_uri(uri);
+
+                self.hyper
+                    .clone()
+                    .request(hyper_request)
+                    .map_err(Error::from)
+            })
+            .and_then(|hyper_response| {
+                E::Response::future_from(hyper_response).map_err(Error::from)
+            })
     }
 
     /// Logs in as a given user
