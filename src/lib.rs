@@ -92,7 +92,7 @@ impl Client {
             login::Request {
                 password: password,
                 medium: None,
-                kind: login::LoginKind::Password,
+                kind: login::LoginType::Password,
                 user: username,
                 address: None,
             }
