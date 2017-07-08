@@ -148,7 +148,7 @@ where
             login::Request {
                 password: password,
                 medium: None,
-                kind: login::LoginType::Password,
+                login_type: login::LoginType::Password,
                 user: username,
                 address: None,
             }
