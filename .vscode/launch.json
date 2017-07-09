@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "examples/hello_world: Debug",
+            "program": "${workspaceRoot}/target/debug/examples/hello_world",
+            "args": [],
+            "sourceLanguages": ["rust"],
+            "cwd": "${workspaceRoot}"
+        }
+    ]
+}
