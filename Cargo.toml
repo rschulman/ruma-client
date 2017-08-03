@@ -14,15 +14,10 @@ version = "0.1.0"
 futures = "0.1.14"
 hyper = "0.11.1"
 ruma-api = "0.4.0"
-ruma-identifiers = "0.11.0"
 serde_json = "1.0.2"
 serde_urlencoded = "0.5.1"
 tokio-core = "0.1.8"
 url = "1.5.1"
-
-[dependencies.ruma-client-api]
-git = "https://github.com/jplatte/ruma-client-api"
-branch = "room_id-workaround"
 
 [dependencies.hyper-tls]
 optional = true
@@ -32,13 +27,21 @@ version = "0.1.2"
 optional = true
 version = "0.1.4"
 
+[dependencies.ruma-client-api]
+git = "https://github.com/jplatte/ruma-client-api"
+branch = "synapse-workarounds"
+
+[dependencies.ruma-identifiers]
+git = "https://github.com/jplatte/ruma-identifiers"
+branch = "synapse-workarounds"
+
 [dev-dependencies]
 futures-await = { git = 'https://github.com/alexcrichton/futures-await' }
-ruma-events = "0.9.0"
+
+[dev-dependencies.ruma-events]
+git = "https://github.com/jplatte/ruma-events"
+branch = "synapse-workarounds"
 
 [features]
 default = ["tls"]
 tls = ["hyper-tls", "native-tls"]
-
-[replace]
-"ruma-events:0.9.0" = { git = "https://github.com/jplatte/ruma-events", branch = "synapse-workarounds" }
