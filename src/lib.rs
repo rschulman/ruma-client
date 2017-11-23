@@ -34,6 +34,7 @@ use native_tls::Error as NativeTlsError;
 use ruma_api::Endpoint;
 use tokio_core::reactor::Handle;
 use url::Url;
+use ruma_identifiers::RoomId;
 
 pub use error::Error;
 pub use session::Session;
@@ -50,8 +51,7 @@ pub struct Client<C: Connect>(Rc<ClientData<C>>);
 /// Data contained in Client's Rc
 #[derive(Debug)]
 pub struct ClientData<C>
-where
-    C: Connect,
+    where C: Connect
 {
     homeserver_url: Url,
     hyper: HyperClient<C>,
@@ -72,7 +72,10 @@ impl Client<HttpConnector> {
 #[cfg(feature = "tls")]
 impl Client<HttpsConnector<HttpConnector>> {
     /// Creates a new client for making HTTPS requests to the given homeserver.
-    pub fn https(handle: &Handle, homeserver_url: Url, session: Option<Session>) -> Result<Self, NativeTlsError> {
+    pub fn https(handle: &Handle,
+                 homeserver_url: Url,
+                 session: Option<Session>)
+                 -> Result<Self, NativeTlsError> {
         let connector = HttpsConnector::new(4, handle)?;
 
         Ok(Client(Rc::new(ClientData {
@@ -89,13 +92,15 @@ impl Client<HttpsConnector<HttpConnector>> {
 }
 
 impl<C> Client<C>
-where
-    C: Connect,
+    where C: Connect
 {
     /// Creates a new client using the given `hyper::Client`.
     ///
     /// This allows the user to configure the details of HTTP as desired.
-    pub fn custom(hyper_client: HyperClient<C>, homeserver_url: Url, session: Option<Session>) -> Self {
+    pub fn custom(hyper_client: HyperClient<C>,
+                  homeserver_url: Url,
+                  session: Option<Session>)
+                  -> Self {
         Client(Rc::new(ClientData {
             homeserver_url: homeserver_url,
             hyper: hyper_client,
@@ -108,24 +113,28 @@ where
     /// In contrast to api::r0::session::login::call(), this method stores the
     /// session data returned by the endpoint in this client, instead of
     /// returning it.
-    pub fn log_in(&self, user: String, password: String)
-    -> impl Future<Item = Session, Error = Error> {
+    pub fn log_in(&self,
+                  user: String,
+                  password: String)
+                  -> impl Future<Item = Session, Error = Error> {
         use api::r0::session::login;
 
         let data = self.0.clone();
 
-        login::call(self.clone(), login::Request {
-            address: None,
-            login_type: login::LoginType::Password,
-            medium: None,
-            password,
-            user,
-        }).map(move |response| {
-            let session = Session::new(response.access_token, response.user_id);
-            *data.session.borrow_mut() = Some(session.clone());
+        login::call(self.clone(),
+                    login::Request {
+                        address: None,
+                        login_type: login::LoginType::Password,
+                        medium: None,
+                        password: password,
+                        user: user,
+                    })
+            .map(move |response| {
+                let session = Session::new(response.access_token, response.user_id);
+                *data.session.borrow_mut() = Some(session.clone());
 
-            session
-        })
+                session
+            })
     }
 
     /// Register as a guest. In contrast to api::r0::account::register::call(),
@@ -136,20 +145,22 @@ where
 
         let data = self.0.clone();
 
-        register::call(self.clone(), register::Request {
-            auth: None,
-            bind_email: None,
-            device_id: None,
-            initial_device_display_name: None,
-            kind: Some(register::RegistrationKind::Guest),
-            password: None,
-            username: None,
-        }).map(move |response| {
-            let session = Session::new(response.access_token, response.user_id);
-            *data.session.borrow_mut() = Some(session.clone());
+        register::call(self.clone(),
+                       register::Request {
+                           auth: None,
+                           bind_email: None,
+                           device_id: None,
+                           initial_device_display_name: None,
+                           kind: Some(register::RegistrationKind::Guest),
+                           password: None,
+                           username: None,
+                       })
+            .map(move |response| {
+                let session = Session::new(response.access_token, response.user_id);
+                *data.session.borrow_mut() = Some(session.clone());
 
-            session
-        })
+                session
+            })
     }
 
     /// Register as a new user on this server.
@@ -160,29 +171,42 @@ where
     ///
     /// The username is the local part of the returned user_id. If it is
     /// omitted from this request, the server will generate one.
-    pub fn register_user(
-        &self,
-        username: Option<String>,
-        password: String,
-    ) -> impl Future<Item = Session, Error = Error> {
+    pub fn register_user(&self,
+                         username: Option<String>,
+                         password: String)
+                         -> impl Future<Item = Session, Error = Error> {
         use api::r0::account::register;
 
         let data = self.0.clone();
 
-        register::call(self.clone(), register::Request {
-            auth: None,
-            bind_email: None,
-            device_id: None,
-            initial_device_display_name: None,
-            kind: Some(register::RegistrationKind::User),
-            password: Some(password),
-            username: username,
-        }).map(move |response| {
-            let session = Session::new(response.access_token, response.user_id);
-            *data.session.borrow_mut() = Some(session.clone());
+        register::call(self.clone(),
+                       register::Request {
+                           auth: None,
+                           bind_email: None,
+                           device_id: None,
+                           initial_device_display_name: None,
+                           kind: Some(register::RegistrationKind::User),
+                           password: Some(password),
+                           username: username,
+                       })
+            .map(move |response| {
+                let session = Session::new(response.access_token, response.user_id);
+                *data.session.borrow_mut() = Some(session.clone());
 
-            session
-        })
+                session
+            })
+    }
+
+    /// Send a message to a room on the server.
+    ///
+    ///
+    pub fn send_message(&self,
+                        message: api::r0::send::send_message_event::Request,
+                        target_room: RoomId)
+                        -> impl Future<Item = (), Error = Error> + 'static {
+        use api::r0::send::send_message_event;
+
+        send_message_event::call(self.clone(), message);
     }
 
     /// Convenience method that represents repeated calls to the sync_events endpoint as a stream.
@@ -190,12 +214,11 @@ where
     /// If the since parameter is None, the first Item might take a significant time to arrive and
     /// be deserialized, because it contains all events that have occured in the whole lifetime of
     /// the logged-in users account and are visible to them.
-    pub fn sync(
-        &self,
-        filter: Option<api::r0::sync::sync_events::Filter>,
-        since: Option<String>,
-        set_presence: bool,
-    ) -> impl Stream<Item = api::r0::sync::sync_events::Response, Error = Error> {
+    pub fn sync(&self,
+                filter: Option<api::r0::sync::sync_events::Filter>,
+                since: Option<String>,
+                set_presence: bool)
+                -> impl Stream<Item = api::r0::sync::sync_events::Response, Error = Error> {
         use api::r0::sync::sync_events;
 
         let client = self.clone();
@@ -206,31 +229,26 @@ where
         };
 
         stream::unfold(since, move |since| {
-            Some(
-                sync_events::call(
-                    client.clone(),
-                    sync_events::Request {
-                        filter: filter.clone(),
-                        since,
-                        full_state: None,
-                        set_presence: set_presence.clone(),
-                        timeout: None,
-                    },
-                ).map(|res| {
+            Some(sync_events::call(client.clone(),
+                                   sync_events::Request {
+                                       filter: filter.clone(),
+                                       since: since,
+                                       full_state: None,
+                                       set_presence: set_presence.clone(),
+                                       timeout: None,
+                                   })
+                .map(|res| {
                     let next_batch_clone = res.next_batch.clone();
                     (res, Some(next_batch_clone))
-                })
-            )
+                }))
         })
     }
 
     /// Makes a request to a Matrix API endpoint.
-    pub(crate) fn request<E>(
-        self,
-        request: <E as Endpoint>::Request,
-    ) -> impl Future<Item = E::Response, Error = Error>
-    where
-        E: Endpoint,
+    pub(crate) fn request<E>(self,
+                             request: <E as Endpoint>::Request)
+                             -> impl Future<Item = E::Response, Error = Error>
+        where E: Endpoint
     {
         let data1 = self.0.clone();
         let data2 = self.0.clone();
